@@ -1,5 +1,4 @@
 #!/bin/python
-# Green Phantom Racer - Racer
 
 # Imports
 import random
@@ -9,10 +8,11 @@ from operator import itemgetter
 from os import system, name, listdir
 import sys
 from prettytable import PrettyTable
+from tabulate import tabulate
 
 def max_fuel():
 	# Returns the maximum fuel allowed 
-	return 50
+	return 100
 
 def title_splash():
 	cs()
@@ -46,10 +46,17 @@ def danger_roll(car):
 	if car['sen'] >= random.randint(1,120):
 		return car
 
-	car['dmg'] = car['dmg']+random.randint(1,10)
+	dam_roll = random.randint(0,19)
 
-	if car['dmg'] > car['fra']:
-		car['wreck'] = 1
+	if dam_roll == 0:
+		car['spun'] = True
+		car['tel_spin_count'] = car['tel_spin_count']  + 1
+	else:
+		car['dmg'] = car['dmg']+dam_roll
+
+		if car['dmg'] > car['fra']:
+			car['wreck'] = True
+
 
 	return car
 
@@ -139,9 +146,17 @@ def car_telementry(car,vm):
 		except:
 			print("Moves cut short by turning: NA")
 		try:
-			print("Moves cut short another car:"+str(car['tel_cutoff']))
+			telemetrics.append("%:Moves cut short another car:"+str(car['tel_failed_overtakes'])+"\n")
 		except:
-			print("Moves cut short another car: NA")
+			telemetrics.append("%:Moves cut short another car: NA\n")
+		try:
+			telemetrics.append("%:Succesful Overtakes:"+str(car['tel_overtakes'])+"\n")
+		except:
+			telemetrics.append("%:Succesful Overtakes: NA\n")
+		try:
+			telemetrics.append("%:Defended from overtakes:"+str(car['tel_defends'])+"\n")
+		except:
+			telemetrics.append("%:Defended from overtakes: NA\n")
 		try:
 			print("Steering vs Thrusters:"+str((car['tel_steer']))+"/"+str(len(car['tel_moves'])))
 		except:
@@ -158,6 +173,10 @@ def car_telementry(car,vm):
 			print("Total Part Degragation:"+str(car['degra']))
 		except:
 			print("Total Part Degragation: NA")
+		try:
+			print("Total Spins:"+str(car['tel_spin_count']))
+		except:
+			print("Total Spins: NA")
 		return "To Screen"
 	if vm == "f":
 		my_date = str(datetime.now())
@@ -224,9 +243,17 @@ def car_telementry(car,vm):
 		except:
 			telemetrics.append("%:Moves cut short by turning: NA\n")
 		try:
-			telemetrics.append("%:Moves cut short another car:"+str(car['tel_cutoff'])+"\n")
+			telemetrics.append("%:Moves cut short another car:"+str(car['tel_failed_overtakes'])+"\n")
 		except:
 			telemetrics.append("%:Moves cut short another car: NA\n")
+		try:
+			telemetrics.append("%:Succesful Overtakes:"+str(car['tel_overtakes'])+"\n")
+		except:
+			telemetrics.append("%:Succesful Overtakes: NA\n")
+		try:
+			telemetrics.append("%:Defended from overtakes:"+str(car['tel_defends'])+"\n")
+		except:
+			telemetrics.append("%:Defended from overtakes: NA\n")
 		try:
 			telemetrics.append("%:Steering vs Thrusters:"+str((car['tel_steer']))+"/"+str(len(car['tel_moves']))+"\n")
 		except:
@@ -243,6 +270,14 @@ def car_telementry(car,vm):
 			telemetrics.append("%:Total Part Degragation:"+str(car['degra'])+"\n")
 		except:
 			telemetrics.append("%:Total Part Degragation: NA\n")
+		try:
+			telemetrics.append("%:Total Spins:"+str(car['tel_spin_count'])+"\n")
+		except:
+			telemetrics.append("%:Total Spins: NA\n")
+		try:
+			telemetrics.append("%:Cause of accident:"+str(car['wreck-note'])+"\n")
+		except:
+			telemetrics.append("%:Cause of accident: NA\n")
 		return telemetrics
 
 def car_status(car):
@@ -251,8 +286,8 @@ def car_status(car):
 	print(txt.format(car['name'],car['pos'],len(car['tel_lap_splits']),car['dmg'],car['fuel'],len(car['tel_pit_time']),car['degra']))
 	return
 
-def finish_race(podium,dnf):
-	points = [20,15,10,7,6,5,4,3,2,1]
+def finish_race(podium,dnf,warp):
+	points = [40,35,30,27,24,21,18,15,12,10,8,6,4,2,1]
 	# How many points this player earns, increment for each car in the podium until we run out of cars to award points
 	p_earn = 0
 
@@ -263,6 +298,8 @@ def finish_race(podium,dnf):
 	for c in podium:
 		lf.write(str(c))
 	for c in dnf:
+		lf.write(str(c))
+	for c in warp:
 		lf.write(str(c))
 	lf.close()
 
@@ -293,7 +330,10 @@ def finish_race(podium,dnf):
 
 	# DNFs do the same, but no points
 	for c in dnf:
+		degra_array = degrade_car(c)
+		save_car(c,degra_array)
 
+	for c in warp:
 		degra_array = degrade_car(c)
 		save_car(c,degra_array)
 
@@ -308,6 +348,7 @@ def save_car(car,degra_array):
 	c_fh.write("#           EDIT USING GARAGE.PY           #\n")
 	c_fh.write("############################################\n")
 	c_fh.write("$:name:"+str(car['name'])+"\n")
+	c_fh.write("$:team:"+str(car['team'])+"\n")
 	c_fh.write("############################################\n")
 	c_fh.write("#                TOUR INFO                 #\n")
 	c_fh.write("############################################\n")
@@ -331,6 +372,8 @@ def save_car(car,degra_array):
 	c_fh.write("############################################\n")
 	c_fh.write("$:pp_fuel:"+str(car['pp_fuel'])+"\n")
 	c_fh.write("$:pp_dam:"+str(car['pp_dam'])+"\n")
+	c_fh.write("$:tactic:"+str(car['tactic'])+"\n")
+	c_fh.write("$:snack:"+str(car['snack'])+"\n")
 	c_fh.write("############################################\n")
 	c_fh.write("#            LAST RACE TELEMETRY           #\n")
 	c_fh.write("############################################\n")
@@ -345,6 +388,11 @@ def save_car(car,degra_array):
 
 def degrade_car(c):
 	# Using a cars degragation, return degraded car
+
+	# First, check if the car was wrecked and apply modifiers
+	if c['wreck'] == True:
+		c['degra'] = c['degra'] + 50
+
 
 	c_fh = open(str(c['file']),"r")
 
@@ -385,7 +433,7 @@ def degrade_car(c):
 
 
 	# Determine total degragation
-	t_deg = round(c['degra']/15)
+	t_deg = round(c['degra']/10)
 
 	# Figure out total degragation
 	while t_deg > 0:
@@ -462,16 +510,17 @@ def degrade_car(c):
 	return degra_ray
 
 def draw_green_light(track):
+
 	nothing = input("Press Enter to Start The Race!\n")
+	cs()
 	print("|-----|\n|*****|\n|*****|\n|*****|\n|-----|\n")
 	time.sleep(1)
 	print("|-----|\n|00000|\n|*****|\n|*****|\n|-----|\n")
 	time.sleep(1)
 	print("|-----|\n|00000|\n|00000|\n|*****|\n|-----|\n")
-	time.sleep(1)
+	time.sleep(random.randint(1,3))
 	print("|-----|\n|00000|\n|00000|\n|00000|\n|-----|\n")
-	time.sleep(1)
-	print("BLAST OFF AT " + track['name']+"!!!!!!!!!!!!!!!")
+	print("BLAST OFF AT THE " + track['name']+"!!!!!!!!!!!!!!!")
 	time.sleep(3)
 	return
 
@@ -479,6 +528,7 @@ def make_car(c_fh,c_fp):
 	# Takes an array of stats from a file and makes a car
 	
 	car = {"name":"",
+	"team":"",
 	"fin":0,
 	"coo":0,
 	"ste":0,
@@ -495,22 +545,28 @@ def make_car(c_fh,c_fp):
 	"lap":0,
 	"pos":0,
 	"dmg":0,
+	"tactic":"",
+	"snack":"",
 	"pts":0,
 	"pp_fuel":0,
 	"pp_dam":0,
 	"degra":0,
 	"fuel":max_fuel(),
-	"wreck":0,
+	"wreck":False,
+	"spun":False,
 	"locale":"Starting Grid",
 	"tel_lap_splits":[],
 	"tel_current_lap":0,
 	"tel_pit_time":[],
 	"tel_moves":[],
 	"tel_ebrakes":0,
-	"tel_cutoff":0,
+	"tel_failed_overtakes":0,
+	"tel_overtakes":0,
+	"tel_defends":0,
 	"tel_steer":0,
 	"tel_fuel_thr":0,
 	"tel_dam_thr":0,
+	"tel_spin_count":0,
 	"time":0,
 	"wreck-note":"",
 	"pit_flag":0,
@@ -560,6 +616,8 @@ def make_car(c_fh,c_fp):
 			# print(this_l)
 			if this_l[1] == "name":
 				car['name'] = this_l[2].strip("\n")
+			elif this_l[1] == "team":
+				car['team'] = str(this_l[2])
 			elif this_l[1] == "points":
 				car['pts'] = int(this_l[2])
 			elif this_l[1] == "thr":
@@ -588,42 +646,47 @@ def make_car(c_fh,c_fp):
 				car['pp_fuel'] = int(this_l[2])
 			elif this_l[1] == "pp_dam":
 				car['pp_dam'] = int(this_l[2])
+			elif this_l[1] == "tactic":
+				car['tactic'] = str(this_l[2])
+			elif this_l[1] == "snack":
+				car['snack'] = str(this_l[2])
+
 
 	# Car chassis affects fragility and coasting
-	if car['cha'] == "streamlined":
+	if car['cha'] == "streamlined": 
 		car['fra'] = 750 - car['thr'] - car['fin'] - car['sen'] - car['fcl'] - car['ste'] - car['coo'] - car['afb'] - car['dia']
 		if car['rea'] == "fission":
 			car['coa'] = 150
 		else:
-			car['coa'] = 75
+			car['coa'] = 80
 	elif car['cha'] == "cubic":
 		car['fra'] = 850 - car['thr'] - car['fin'] - car['sen'] - car['fcl'] - car['ste'] - car['coo'] - car['afb'] - car['dia']
 		if car['rea'] == "fission":
 			car['coa'] = 50
 		else:
-			car['coa'] = 25
+			car['coa'] = 30
 	else:
 		# Assume neutral
 		car['fra'] = 800 - car['thr'] - car['fin'] - car['sen'] - car['fcl'] - car['ste'] - car['coo'] - car['afb'] - car['dia']
 		if car['rea'] == "fission":
 			car['coa'] = 100
 		else:
-			car['coa'] = 50
+			car['coa'] = 60
 	return car
 
 def load_gp(gp):
 	# Open all files in the gp folder
 	# Make a car for each and return array
 	prix_cars = []
-	for filename in listdir("./"+gp):
+	for filename in listdir("./tours/"+gp):
 		# Only open car files
 		if ".car" not in filename:
 			continue
 		if "template.car" in filename:
 			continue
 		# Open Files
-		car_fp = "./"+gp+"/"+filename
-		print(car_fp)
+		car_fp = "./tours/"+gp+"/"+filename
+		# print(car_fp)
 		car_f = open(car_fp,"r")
 		car_o = make_car(car_f,car_fp)
 		# Fix car filepath
@@ -633,12 +696,36 @@ def load_gp(gp):
 	print(str(len(prix_cars))+" craft added.")
 	return prix_cars
 
+def load_warp():
+	# Open all files in the gp folder
+	# Make a car for each and return array
+	warp_cars = []
+	for filename in listdir("./tours/warp"):
+		# Only open car files
+		if ".car" not in filename:
+			continue
+		if "template.car" in filename:
+			continue
+		# Open Files
+		car_fp = "./tours/warp/"+filename
+		# print(car_fp)
+		car_f = open(car_fp,"r")
+		car_o = make_car(car_f,car_fp)
+		# Fix car filepath
+		warp_cars.append(car_o)
+		car_f.close()
+
+	# print(str(len(warp_cars))+" craft added.")
+	return warp_cars
+
 def load_track(t_fh):
 
 	this_track = {
 	"name":"",
 	"lc":0,
-	"course":[]}
+	"course":[],
+	"flag":0,
+	"anomaly":"none"}
 
 	for l in t_fh:
 		if l.startswith("$"):
@@ -652,7 +739,86 @@ def load_track(t_fh):
 
 	return this_track
 
-def move_car(car,track,mover,all_cars):
+def roll_anomaly():
+	# Returns a string to delcare what the anomaly is and about how long it will last
+	roll_anomaly = random.randint(0,6)
+	time = random.randint(10,30)
+	if roll_anomaly == 0:
+		return "Dog on track.", time
+	elif roll_anomaly == 1:
+		return "Toxic goo on track.", time
+	elif roll_anomaly == 2:
+		return "Robot uprising.", time
+	elif roll_anomaly == 3:
+		return "Unspeakable horror.", time
+	elif roll_anomaly == 4:
+		return "MEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOWMEOW.", time
+	elif roll_anomaly == 5:
+		return "Advertising break required.", time
+	elif roll_anomaly == 6:
+		return "Bigfoot on track.", time
+
+def battle(attacker,defender):
+	# Roll
+	if attacker['snack'] == "porridge":
+		att_roll = random.randint(20,80)
+	elif attacker['snack'] == "nachos":
+		att_roll = random.randint(-20,120)
+	elif attacker['snack'] == "universe":
+		att_roll = random.randint(-50,150)
+	else:
+		# Ice cream!
+		att_roll = random.randint(0,100)
+
+	# Roll
+	if defender['snack'] == "porridge":
+		def_roll = random.randint(20,80)
+	elif defender['snack'] == "nachos":
+		def_roll = random.randint(-20,120)
+	elif defender['snack'] == "universe":
+		def_roll = random.randint(-50,150)
+	else:
+		# Ice cream!
+		def_roll = random.randint(0,100)
+
+	# Modifiers
+	if attacker['tactic'] == "cautious":
+		att_roll = att_roll - 15
+	elif attacker['tactic'] == "psycho":
+		att_roll = att_roll + 20
+	elif attacker['tactic'] == "universe":
+		att_roll = att_roll + 25
+
+	if defender['tactic'] == "cautious":
+		def_roll = def_roll + 20
+	elif defender['tactic'] == "psycho":
+		def_roll = def_roll - 15
+	elif defender['tactic'] == "universe":
+		def_roll = def_roll + 25
+
+	# Compare
+	if att_roll > def_roll * 2:
+		# Double damage!
+		defender = danger_roll(defender)
+		defender = danger_roll(defender)
+		attacker['tel_overtakes'] = attacker['tel_overtakes'] + 1
+	elif def_roll > att_roll * 2:
+		# Double damage!
+		attacker = danger_roll(attacker)
+		attacker = danger_roll(attacker)
+		attacker['c_speed'] = 0
+		defender['tel_defends'] = defender['tel_defends'] + 1
+		attacker['tel_failed_overtakes'] = attacker['tel_failed_overtakes'] + 1
+	elif def_roll > att_roll:
+		attacker['c_speed'] = 0
+		defender['tel_defends'] = defender['tel_defends'] + 1
+		attacker['tel_failed_overtakes'] = attacker['tel_failed_overtakes'] + 1
+	else:
+		attacker['tel_overtakes'] = attacker['tel_overtakes'] + 1
+	
+	return attacker,defender
+
+def move_car(car,track,mover,all_cars,warp):
 	# print(car['name'] + " moving!")
 	# Car takes 1 clock tick
 	car['time'] = car['time'] + 1
@@ -667,21 +833,29 @@ def move_car(car,track,mover,all_cars):
 		if car['pit_flag'] == 1:
 			car = pit(car)
 			car['pit_flag'] = car['pit_flag']+1
-			return car, all_cars
+			return car, all_cars,warp
 		# Otherwise, wait for daignostics to finish
 		if car['dia'] + ((car['pit_flag']-2)*5) > random.randint(1,100):
 			roll = car['dia'] + (car['pit_flag']*5)
 			# print("Pit roll of "+str(roll)+" was not high enough!")
 			car['tel_pit_time'].append(car['pit_flag'])
 			car['pit_flag'] = 0
+			car['pos'] = car['pos']+1
 		else:
 			car['pit_flag'] = car['pit_flag'] + 1
 
-		return car, all_cars
+		return car, all_cars,warp
 
+	# SPinning goes here
+	if car['spun']:
+		# Attempt to un spin
+		if car['ste'] > random.randint(0,120):
+			car['spun'] = False
+			return car, all_cars,warp
+		else:
+			return car, all_cars,warp
 
-
-
+	
 	# Speed roll, either thrusters or steering based on other driver positions and based on reactor
 	if['rea'] == "fission":
 		if mover == 0:
@@ -690,15 +864,19 @@ def move_car(car,track,mover,all_cars):
 			c_speed = car['ste']-random.randint(1,100)+car['coa']
 	else:
 		if mover == 0:
-			c_speed = (car['thr']*2)-random.randint(1,200)
+			c_speed = ((car['thr']*2)-random.randint(1,200))+(car['afb']-random.randint(20,80))
 		else:
-			c_speed = (car['ste']*2)-random.randint(1,200)
+			c_speed = ((car['ste']*2)-random.randint(1,200))+(car['afb']-random.randint(20,80))
 
 		if c_speed < car['coa']:
 			c_speed = car['coa']
 
+	
 	# Fuel affects afterburners, fuelcell, and coolant efficiency
-	if car['fty'] == "plutonium":
+	if track['flag'] > 0:
+		if random.randint(0,3) == 0:
+			car['fuel'] = car['fuel'] - 1
+	elif car['fty'] == "plutonium":
 		# Plutonium is the high risk/high reward fuel, requires both coolant and fcl efficiency
 		if car['coo'] < random.randint(1,100) or car['fcl'] < random.randint(1,100):
 			car['fuel'] = car['fuel'] - 3
@@ -715,9 +893,9 @@ def move_car(car,track,mover,all_cars):
 	elif car['fty'] == "uranium":
 		# Middle of the ground fuel
 		if car['coo'] < random.randint(1,100):
-			car['fuel'] = car['fuel'] - 3
+			car['fuel'] = car['fuel'] - 6
 		elif car['fcl'] < random.randint(1,100):
-			car['fuel'] = car['fuel'] - 1
+			car['fuel'] = car['fuel'] - 2
 		else:
 			car['fuel'] = car['fuel'] + 1
 
@@ -729,9 +907,9 @@ def move_car(car,track,mover,all_cars):
 		# Radium
 		# Safest fuel
 		if car['coo'] < random.randint(1,100):
-			car['fuel'] = car['fuel'] - 2
+			car['fuel'] = car['fuel'] - 4
 		elif car['fcl'] < random.randint(1,120):
-			car['fuel'] = car['fuel'] - 1
+			car['fuel'] = car['fuel'] - 2
 		else:
 			car['fuel'] = car['fuel'] + 1
 
@@ -740,18 +918,62 @@ def move_car(car,track,mover,all_cars):
 		if ab_roll > 0:
 			c_speed = c_speed + ab_roll
 
+	# If there is a yellow flag, and this is the first car, reduce speed greatly.
+	if track['flag'] > 0 and car == all_cars[0]:
+		c_speed = 15
+
+	# Check for anomaly events
+	if track['anomaly'] == "Dog on track.":
+		unlucky = random.randint(0,999)
+		if unlucky == 999:
+			car['wreck'] = True
+			car['wreck-note'] = "Crashed into the dog! "+car['name']+" died!"
+			return car, all_cars,warp
+		elif unlucky >= 900:
+			car['wreck'] = True
+			car['wreck-note'] = "Crashed into the dog!"
+			return car, all_cars,warp
+	elif track['anomaly'] == "Robot uprising.":
+		unlucky = random.randint(0,999)
+		if unlucky == 999:
+			car['wreck'] = True
+			car['wreck-note'] = "Was attacked by robots! "+car['name']+" was taken prisoner by the robots!"
+			return car, all_cars,warp
+		elif unlucky >= 900:
+			car['wreck'] = True
+			car['wreck-note'] = "Was attacked by robots!"
+			return car, all_cars,warp		
+	elif track['anomaly'] == "Unspeakable horror.":
+		unlucky = random.randint(0,999)
+		if unlucky == 999:
+			car['wreck-note'] = "WARPED!"
+			all_cars.remove(car)
+			warp.append(car)
+			return car, all_cars,warp
+
+
 	# If you max out fuel, or go too fast, danger!
-	if car['fuel'] > 50 or c_speed >= 200:
+	if car['fuel'] > 105 or c_speed >= 250:
+		# If you ate the nachos, you may warp
+		if car['snack'] == "nachos" and random.randint(0,249) == 0 and len(all_cars) > 0:
+			# WARP
+			car['wreck-note'] = "WARPED!"
+			all_cars.remove(car)
+			warp.append(car)
+			return car, all_cars,warp
 		car = danger_roll(car)
-		if car['wreck'] == 1:
+		if car['wreck'] == True:
 			car['wreck-note'] = "Destroyed in meltdown!"
-			return car, all_cars
+						# Roll to see if the driver survived
+			if random.randint(0,99) == 99:
+				car['wreck-note'] = car['wreck-note']+" "+car['name']+" died!"
+			return car, all_cars,warp
 
 	# If you run out of fuel your done!
 	if car['fuel'] < 0:
-		car['wreck'] = 1
+		car['wreck'] = True
 		car['wreck-note'] = "Out of fuel."
-		return car, all_cars
+		return car, all_cars,warp
 
 	# Move based on car position
 	while c_speed > 0:
@@ -765,11 +987,12 @@ def move_car(car,track,mover,all_cars):
 			car['lap'] = car['lap']+1
 			c_speed = c_speed - 5
 			# Add to car splits
-			car['tel_lap_splits'].append(car['tel_current_lap'])
-			car['tel_current_lap'] = 0
+			if car['lap'] > 0:
+				car['tel_lap_splits'].append(car['tel_current_lap'])
+				car['tel_current_lap'] = 0
 			# Stop checking if car finished
 			if car['lap'] >= track['lc']:
-				return car, all_cars
+				return car, all_cars,warp
 			continue
 		# Then race as normal:
 		if track['course'][car['pos']] == "straight":
@@ -790,9 +1013,9 @@ def move_car(car,track,mover,all_cars):
 				c_speed = 0
 				car['tel_ebrakes'] = car['tel_ebrakes']+1
 				car = danger_roll(car)
-				if car['wreck'] == 1:
+				if car['wreck']:
 					car['wreck-note'] = "Wrecked on curve"
-				return car, all_cars
+				return car, all_cars,warp
 		elif track['course'][car['pos']] == "turn":
 			# Check with fins
 			if car['fin']  >= random.randint(1,120):
@@ -807,17 +1030,19 @@ def move_car(car,track,mover,all_cars):
 				c_speed = 0
 				car['tel_ebrakes'] = car['tel_ebrakes']+1
 				car = danger_roll(car)
-				if car['wreck'] == 1:
-					car['wreck-note'] = "Wrecked on turn"
-				return car, all_cars
+				if car['wreck']:
+					car['wreck-note'] = "Wrecked on turn."
+					if random.randint(0,99) == 99:
+						car['wreck-note'] = car['wreck-note']+ " "+car['name']+" died!"
+				return car, all_cars,warp
 		elif track['course'][car['pos']] == "pit":
-			if car['pp_fuel'] >= car['fuel'] or car['pp_dam'] <= car['dmg']:
+			if car['pp_fuel'] >= car['fuel'] or car['pp_dam'] <= car['dmg'] or track['flag'] >= 5:
 				if car['pp_fuel'] >= car['fuel']:
 					car["tel_fuel_thr"] = car["tel_fuel_thr"] + 1
 				if car['pp_dam'] <= car['dmg']:
 					car["tel_dam_thr"] = car["tel_dam_thr"] + 1
 				car['pit_flag'] = 1
-				return car, all_cars
+				return car, all_cars,warp
 			else:
 				c_speed = c_speed - 5
 				car['pos'] = car['pos'] + 1				
@@ -826,6 +1051,7 @@ def move_car(car,track,mover,all_cars):
 		# Check if you passed a car
 		else:
 			print("ERROR! " + track['course'][car['pos']])
+			print(car['pos'])
 			time.sleep(1)
 		
 		# Go through all cars
@@ -834,38 +1060,59 @@ def move_car(car,track,mover,all_cars):
 			if car['name'] == v['name']:
 				continue
 			# Skip Cars behind this one, as lapped cars move to the side
-			if car['lap'] > v['lap']:
+			elif car['lap'] > v['lap']:
 				continue
-			if car['pos'] == v['pos']:
-				# Danger roll for both cars
-				car = danger_roll(car)
-				v = danger_roll(v)
-				if v['wreck'] == 1:
-					v['wreck-note'] = "Wrecked in collision with "+car['name']
-				if car['wreck'] == 1:
-					car['wreck-note'] = "Wrecked in collision with "+v['name']
-					return car, all_cars
+			# If there is a saftey car, dont try and overtake
+			elif track['flag'] > 0 and car['lap'] == v['lap'] and (car['pos'] == v['pos'] -1 or (car['pos']==len(track['course']) and v['pos'] == 0)):
+				return car, all_cars,warp				
+			elif car['pos'] == v['pos']:
+				# If you are teammates, maybe you wont fight
+				if v['team'] == car['team']:
+					if v['tactic'] == "team" or v['tactic'] == "cautious" or car['tactic'] == "cautious":
+						continue
+				else:
+					car,v = battle(car,v)
+					if v['wreck']:
+						v['wreck-note'] = "Wrecked in collision with "+car['name']
+						# Roll to see if the driver survived
+						if random.randint(0,99) == 99:
+							v['wreck-note'] = v['wreck-note']+" "+v['name']+" died!"
+					if car['wreck']:
+						car['wreck-note'] = "Wrecked in collision with "+v['name']
+						# Roll to see if the driver survived
+						if random.randint(0,99) == 99:
+							car['wreck-note'] = car['wreck-notename']+car['driver']+" died!"				
+						return car, all_cars,warp
 
 
 	# Return the car with the new position
 
-	return car, all_cars
+	return car, all_cars,warp
 
 def race(these_cars,track,info):
 	podium = []
 	dnf = []
+	warp = load_warp()
+	normality = True
+	entro_bonus = 0
+
+	# Calculate nachos roll
+	for car in these_cars:
+		if car['tactic'] == "nachos":
+			entro_bonus = entro_bonus + 10
+
 	positions = []
 
 	# Line Up cars
 	# Hand over cars with highest time to lowest (or in order of being loaded in the case of practice), and use that to slot them in starting on the lowest line
-	s = len(these_cars)-1
+	s = 0
 	for t in these_cars:
-		t['pos'] = s
-		s = s - 1
+		t['pos'] = len(track['course'])-1-s
+		s = s + 1
 		positions.append(t['pos'])
 
 	# Draw race at pole, then start
-	draw_race(podium,dnf,these_cars,track,info)
+	draw_race(podium,dnf,warp,these_cars,track,info)
 	draw_green_light(track)
 
 	while len(these_cars) > 0:
@@ -889,8 +1136,7 @@ def race(these_cars,track,info):
 			# Save current car position for telemetry
 			start_point = c['pos']
 
-			c,these_cars = move_car(c,track,mm,these_cars)
-
+			c,these_cars,warp = move_car(c,track,mm,these_cars,warp)
 
 
 			# Save move speed
@@ -901,6 +1147,10 @@ def race(these_cars,track,info):
 				c['tel_moves'].append(c['pos']-start_point)
 
 
+			# Do a secondary check for running out of fuel
+			if c['fuel'] < 0 and c['wreck'] == False:
+				c['wreck'] = True
+				c['wreck-note'] = "Out of fuel."
 
 			if c['lap'] >= track['lc']:
 				print("FINISH - "+c['name'])
@@ -910,25 +1160,58 @@ def race(these_cars,track,info):
 
 				podium.append(c)
 				these_cars.remove(c)
-			elif c['wreck'] == 1:
+			elif c['lap'] + 1 == track['lc']:
+				# Maybe a car is released from the Warp
+				for w in warp:
+					if random.randint(0,99) == 99:
+						w['laps'] = track['lc'] - 1
+						w['pos'] = 0
+						warp.remove(w)
+						these_cars.append(w)
+			elif c['wreck']:
 				c['degra'] = c['degra'] + c['dmg']
 				dnf.append(c)
 				these_cars.remove(c)
 				# Look if there was another car that was wrecked during the move
 				for v in these_cars:
-					if v['wreck'] == 1:
+					if v['wreck']:
 						c['degra'] = c['degra'] + c['dmg']
 						dnf.append(v)
 						these_cars.remove(v)					
 				# Check for pile ups
 				for v in these_cars:
+					if v['wreck']:
+						continue
 					if c['pos'] - 5 <= v['pos'] <= c['pos']:
-						v = danger_roll(v)
-					if v['wreck'] == 1:
+						# Avoid damage with a positive roll from the driver
+						dodge_roll = random.randint(-50,50)
+						if c['tactic'] == "cautious":
+							dodge_roll = dodge_roll + 20
+						elif c['tactic'] == "psycho":
+							dodge_roll = dodge_roll - 10
+
+						if c['tactic'] == "porridge" or c['tactic'] == "universe":
+							dodge_roll = dodge_roll + 20
+						elif c['tactic'] == "nachos":
+							dodge_roll = dodge_roll + random.randint(-25,25)
+
+						if dodge_roll < 0:
+							v = danger_roll(v)
+							v = danger_roll(v)
+							v = danger_roll(v)
+
+					if v['wreck']:
 						v['wreck-note'] = "Wrecked in pileup"
-						c['degra'] = c['degra'] + c['dmg']
+						# Roll to see if the driver survived
+						if random.randint(0,99) == 99:
+							v['wreck-note'] = v['wreck-note']+" "+v['name']+" died!"
+						v['degra'] = v['degra'] + v['dmg']
 						dnf.append(v)
 						these_cars.remove(v)
+				# Check if a saftey car must be deployed
+				if random.randint(0,1) == 1:
+					track['flag'] = track['flag']+random.randint(10,30)
+					track['anomaly'] = "Cleaning up wreck."
 			else:
 				pass
 
@@ -947,10 +1230,20 @@ def race(these_cars,track,info):
 		# Reset order of cars for next clock tick
 		these_cars = sorted(these_cars, key=itemgetter('lap','pos'),reverse=True)
 
+		# Move saftey car if required
+		if track['flag'] > 100:
+			track['flag'] = 99
+		elif track['flag'] > 0:
+			track['flag'] = track['flag'] - 1
+		elif normality == True and (random.randint(0,1999)+entro_bonus > 1998):
+			# Roll for an anomaly
+			track['anomaly'],track['flag'] = roll_anomaly()
+			normality = False
+
 		try:
-			draw_race(podium,dnf,these_cars,track,info)
+			draw_race(podium,dnf,warp,these_cars,track,info)
 		except:
-			pass
+			print("draw error!")
 
 	these_cars = sorted(these_cars, key=itemgetter('time','ball'))
 	print("+----------------------+")
@@ -974,19 +1267,25 @@ def race(these_cars,track,info):
 	for c in dnf:
 		print(c['name']+" - "+c['wreck-note'])
 
-	return podium,dnf
+
+	for c in warp:
+		if c['name'] == "The Red Spector" or c['name'] == "The Green Phantom":
+			continue
+		print(c['name']+" is stuck in the warp!")
+
+	return podium,dnf,warp
 
 def qualify(these_cars,track):
 	# Returns cars with their poll position
 	q = 0
 
 	for c in these_cars:
-		print("Car "+c['name']+" qualifying")
+		print("Pilot "+c['name']+" qualifying")
 		time.sleep(1)
 
 		while c['lap'] < 3:
 			# Positions is a null array because there are no other cars on the track during qualifiers, also that is why move value is always 0!
-			move_car(c,track,0,[])
+			move_car(c,track,0,[],[])
 
 
 			# If a car wrecks, they go to the end of the qualfying table
@@ -1001,18 +1300,20 @@ def qualify(these_cars,track):
 	these_cars = sorted(these_cars, key=itemgetter('time','ball'))
 
 	# Show qualifying information:
-	print("+-------------+")
-	print("|Pole Position|")
-	print("+-------------+")
+	grid_position = 1
+	t = PrettyTable(["Position","Pilot","Team","Time"])
 
-	for p in these_cars:
-		print(p['name']+" - "+str(p['time']))
+	for c in these_cars:
+		t.add_row([grid_position,c['name'],c['team'],str(c['time'])])
+		grid_position = grid_position + 1
+	# 1 Point for pole position
+	these_cars[0]['pts'] = these_cars[0]['pts'] + 1
 
 	# After quaifying, car is repaired and readied for the race
 	for c in these_cars:
 		c['fuel'] = max_fuel()
 		c['dmg'] = 0
-		c['lap'] = 0
+		c['lap'] = -1
 		c['degra'] = 0
 		c['wreck'] = 0
 		c['time'] = 0
@@ -1024,7 +1325,9 @@ def qualify(these_cars,track):
 		c['tel_pit_time'] = []
 		c['tel_moves'] = []
 		c['tel_ebrakes'] = 0
-		c['tel_cutoff'] = 0
+		c['tel_failed_overtakes'] = 0
+		c['tel_overtakes'] = 0
+		c['tel_defends'] = 0
 		c['tel_steer'] = 0
 		c['tel_fuel_thr'] = 0
 		c['tel_dam_thr'] = 0
@@ -1035,14 +1338,14 @@ def qualify(these_cars,track):
 
 
 
-def draw_race(podium,dnf,cars,track,info):
+def draw_race(podium,dnf,warp,cars,track,info):
 	# Needs a practice argument to change the output?
 	# info = r = race info, a lot of stuff hidden
 	# info = p = practice info, show lots of metrics?
 
 	# Clear screen
 	cs()
-	print(track['name']+" Grand Prix")
+	print(track['name'])
 	# Use first place car for metrics
 	try:
 		txt = "Time:{0}"
@@ -1056,65 +1359,70 @@ def draw_race(podium,dnf,cars,track,info):
 		print(txt.format(podium[0]['lap'],track['lc']))
 	# Would also like to show fastest time if possible
 
+	# Show - if a green or yellow flag
+	if track['flag'] == 0:
+		print("###GREEN FLAG###")
+	else:
+		print("###YELLOW FLAG!### : "+str(track['flag'])+" : "+track['anomaly'])
+
+	#Calculate interval based on first place
+	try:
+		lead_int = podium[0]['pos']+(podium[0]['lap']*len(track['course']))		
+	except:
+		lead_int = cars[0]['pos']+(cars[0]['lap']*len(track['course']))
+
+	# print(lead_int)
 	p = 1
 	# Table Header
-	t = PrettyTable(["Pos","Car","Location","Lap","Fastest Lap","Pitstops","Damage","Fuel","Status"])
+	pole_headers = ["Pos","Pilot","Team","Interval","Fastest Lap","Pitstops","Damage","Fuel","Status"]
+	pole_table = []
 
 	for c in podium:
+		c_inter = lead_int - c['pos']-(c['lap']*len(track['course']))
+		c_damper = round(((c['dmg']/c['fra'])*100),2)
+		c_damper = str(c_damper)+"%"
 		try:
-			t.add_row([p,c['name'],c['pos'],c['lap'],min(c['tel_lap_splits']),len(c['tel_pit_time']),c['dmg'],c['fuel'],"FINISHED-"+str(c['time'])])
+			pole_table.append([p,c['name'],c['team'],c_inter,str(min(c['tel_lap_splits']))+"."+str(c['ball']),len(c['tel_pit_time']),c_damper,c['fuel'],"FINISHED-"+str(c['time'])])
 		except:
-			t.add_row([p,c['name'],c['pos'],c['lap'],"NA","NA",c['dmg'],c['fuel'],"FINISHED-"+str(c['time'])])
+			pole_table.append([p,c['name'],c['team'],c_inter,"NA","NA",c_damper,c['fuel'],"FINISHED-"+str(c['time'])])
 		p = p + 1
 
 	for c in cars:
+		c_inter = lead_int - c['pos']-(c['lap']*len(track['course']))
+		c_damper = round(((c['dmg']/c['fra'])*100),2)
+		c_damper = str(c_damper)+"%"
 		if c['pit_flag'] > 0:
 			try:
-				t.add_row([p,c['name'],c['pos'],c['lap'],min(c['tel_lap_splits']),len(c['tel_pit_time']),c['dmg'],c['fuel'],"In Pit"])
+				pole_table.append([p,c['name'],c['team'],c_inter,min(c['tel_lap_splits']),len(c['tel_pit_time']),c_damper,c['fuel'],"In Pit"])
 			except:
-				t.add_row([p,c['name'],c['pos'],c['lap'],"NA","NA",c['dmg'],c['fuel'],"In Pit"])
+				pole_table.append([p,c['name'],c['team'],c_inter,"NA","NA",c_damper,c['fuel'],"In Pit"])
+		elif c['spun']:
+			try:
+				pole_table.append([p,c['name'],c['team'],c_inter,min(c['tel_lap_splits']),len(c['tel_pit_time']),c_damper,c['fuel'],"Spun!"])
+			except:
+				pole_table.append([p,c['name'],c['team'],c_inter,"NA","NA",c_damper,c['fuel'],"Spun!"])
 		elif c['pit_flag'] == 0:
 			try:
-				t.add_row([p,c['name'],c['pos'],c['lap'],min(c['tel_lap_splits']),len(c['tel_pit_time']),c['dmg'],c['fuel'],"Racing"])
+				pole_table.append([p,c['name'],c['team'],c_inter,min(c['tel_lap_splits']),len(c['tel_pit_time']),c_damper,c['fuel'],"Racing"])
 			except:
-				t.add_row([p,c['name'],c['pos'],c['lap'],"NA","NA",c['dmg'],c['fuel'],"Racing"])
+				pole_table.append([p,c['name'],c['team'],c_inter,"NA","NA",c_damper,c['fuel'],"Racing"])
 		p = p + 1
 
 	for c in dnf:
-			try:
-				t.add_row(["X",c['name'],c['pos'],c['lap'],min(c['tel_lap_splits']),len(c['tel_pit_time']),c['dmg'],c['fuel'],c['wreck-note']])
-			except:
-				t.add_row(["X",c['name'],c['pos'],c['lap'],"NA","NA",c['dmg'],c['fuel'],c['wreck-note']])
+		c_damper = round(((c['dmg']/c['fra'])*100),2)
+		c_damper = str(c_damper)+"%"
+		try:
+			pole_table.append(["X",c['name'],c['team'],"NA",min(c['tel_lap_splits']),len(c['tel_pit_time']),c_damper,c['fuel'],c['wreck-note']])
+		except:
+			pole_table.append(["X",c['name'],c['team'],"NA","NA","NA",c_damper,c['fuel'],c['wreck-note']])
 
-	print(t)
+	for c in warp:
+		if c['name'] == "The Red Spector" or c['name'] == "The Green Phantom":
+			continue
+		pole_table.append(["?",c['name'],c['team'],"???","???","???","???","???","WARPPED!"])
 
-	# Eventually, location will become local
-
-	# Draw Track, 70 per line
-	x = 0
-
-	print("+----------------------------------------------------------------------+")
-	while x < len(track['course']):
-		# Draw the line up to the next 70
-		y = 0
-		line = "|"
-		while y < 70:
-			# If there is a car here, put an "X"
-			# Otherwise, just a space
-			s = " "
-		
-			for c in cars:
-				if c['pos'] == x:
-					s = "X"
-
-			line = line+s
-
-			y = y + 1
-			x = x + 1
-		# Print the line
-		print(line+"|")
-	print("+----------------------------------------------------------------------+")
-
+	# print(t)
+	print(tabulate(pole_table,pole_headers,tablefmt="github"))
 
 	time.sleep(1)
 
@@ -1211,7 +1519,7 @@ if __name__ == "__main__":
 			car_telementry(d,"h")			
 
 	else:
-		print("Cars Qualifying:")
+		print("Hovercrafts Qualifying:")
 		# Draw Something?
 		grid = qualify(cars,track)
 		junk = "Lineup?\n"
@@ -1219,17 +1527,20 @@ if __name__ == "__main__":
 
 		# Cars get a pitstop before racing?
 
-		podium,dnf = race(grid,track,"r")
+		podium,dnf,warp = race(grid,track,"r")
  
 		do_save = input('Save y/n? ')
 
 		if do_save == "y":
-			finish_race(podium,dnf)
+			finish_race(podium,dnf,warp)
 		elif do_save == "d":
 			for p in podium:
 				print(p)
 				car_telementry(p,"h")
 			for d in dnf:
+				print(d)
+				car_telementry(d,"h")
+			for d in warp:
 				print(d)
 				car_telementry(d,"h")
 
